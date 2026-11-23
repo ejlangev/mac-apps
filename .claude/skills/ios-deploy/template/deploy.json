@@ -1,0 +1,7 @@
+{
+  "name": "__DISPLAY__",
+  "bundleId": "__BUNDLE_ID__",
+  "scheme": "__APP__",
+  "project": "__APP__.xcodeproj",
+  "devices": __DEVICES__
+}
