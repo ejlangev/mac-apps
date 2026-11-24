@@ -55,13 +55,53 @@ if [[ -f project.yml ]]; then
   xcodegen generate --quiet
 fi
 
+archive() {
+  rm -rf "$ARCHIVE"
+  xcodebuild archive -quiet \
+    -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+    -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
+    -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+    DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+    CURRENT_PROJECT_VERSION="$BUILD_NUM" APP_DIST_HOST="$HOST"
+}
+# Prints the app's device names whose UDID is not in the archive's provisioning profile.
+unprovisioned() {
+  local prof="$OUT/profile.plist" d udid
+  local apps=("$ARCHIVE"/Products/Applications/*.app)
+  security cms -D -i "${apps[0]}/embedded.mobileprovision" >"$prof" 2>/dev/null || : >"$prof"
+  for d in $DEVICES; do
+    udid="$(jget "$CONFIG" "devices.$d.udid")"
+    [[ -n "$udid" ]] && ! grep -q "<string>$udid</string>" "$prof" && echo "$d"
+  done
+  return 0
+}
+
 say "archive $NAME build $BUILD_NUM (team $TEAM)"
-xcodebuild archive -quiet \
-  -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
-  -destination 'generic/platform=iOS' -archivePath "$ARCHIVE" \
-  -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
-  DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
-  CURRENT_PROJECT_VERSION="$BUILD_NUM" APP_DIST_HOST="$HOST"
+ARCHIVED=0; archive && ARCHIVED=1
+MISSING="$( ((ARCHIVED)) && unprovisioned || echo "$DEVICES")"
+if [[ -n "$MISSING" ]]; then
+  # A generic-destination archive never registers devices with Apple. Building once for a
+  # connected device does, and the next archive's profile then includes it.
+  say "registering devices with Apple:" $MISSING
+  xcrun devicectl list devices --json-output "$OUT/devices.json" >/dev/null 2>&1 || : >"$OUT/devices.json"
+  for d in $MISSING; do
+    udid="$(jget "$CONFIG" "devices.$d.udid")"
+    if [[ -n "$udid" ]] && grep -q "$udid" "$OUT/devices.json"; then
+      xcodebuild build -quiet -project "$PROJECT" -scheme "$SCHEME" -configuration Release \
+        -destination "id=$udid" -derivedDataPath "$OUT/register" \
+        -allowProvisioningUpdates -allowProvisioningDeviceRegistration \
+        DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic APP_DIST_HOST="$HOST" \
+        >"$OUT/register-$d.log" 2>&1 || echo "warning: could not register $d (see $OUT/register-$d.log)" >&2
+    else
+      echo "warning: $d is not connected to this Mac, so it can't be registered yet" >&2
+    fi
+  done
+  rm -rf "$OUT/register"
+  archive || die "archive failed"
+  MISSING="$(unprovisioned)"
+  [[ -n "$MISSING" ]] && echo "warning: not in this build's profile, so they can't install it:" $MISSING \
+    "(connect each once, on the same Wi-Fi or by cable, and deploy again)" >&2 || true
+fi
 
 cat >"$OUT/ExportOptions.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>

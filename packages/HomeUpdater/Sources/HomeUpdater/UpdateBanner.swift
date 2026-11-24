@@ -16,6 +16,8 @@ struct HomeUpdaterModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
+            // Fill the screen so the inset pins to the top even when the app's root view is small.
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if let update = updater.availableUpdate, update.build != dismissedBuild {
                     UpdateBanner(
@@ -41,29 +43,62 @@ struct UpdateBanner: View {
     let install: () -> Void
     let dismiss: () -> Void
 
+    /// deploy.sh stamps builds as YYYYMMDDHHMM; show that as a date when it parses.
+    private var detail: String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.dateFormat = "yyyyMMddHHmm"
+        if let date = f.date(from: String(update.build)) {
+            return "Version \(update.version) · \(date.formatted(.relative(presentation: .named, unitsStyle: .abbreviated)))"
+        }
+        return "Version \(update.version) (\(update.build))"
+    }
+
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "arrow.down.app.fill")
-                .font(.title2)
-            VStack(alignment: .leading, spacing: 2) {
+            Image(systemName: "arrow.down.circle.fill")
+                .font(.system(size: 26, weight: .semibold))
+                .symbolRenderingMode(.hierarchical)
+            VStack(alignment: .leading, spacing: 1) {
                 Text("Update available")
-                    .font(.headline)
-                Text("Version \(update.version) (\(String(update.build)))")
+                    .font(.subheadline.weight(.semibold))
+                Text(detail)
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .opacity(0.85)
+                    .lineLimit(1)
             }
-            Spacer()
-            Button("Install", action: install)
-                .buttonStyle(.borderedProminent)
+            Spacer(minLength: 8)
+            Button(action: install) {
+                Text("Update")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 6)
+                    .background(.white, in: Capsule())
+            }
+            .buttonStyle(.plain)
             Button(action: dismiss) {
                 Image(systemName: "xmark")
+                    .font(.footnote.weight(.bold))
+                    .frame(width: 28, height: 28)
+                    .background(.white.opacity(0.2), in: Circle())
             }
-            .buttonStyle(.borderless)
+            .buttonStyle(.plain)
             .accessibilityLabel("Dismiss")
         }
-        .padding(12)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 14))
-        .padding(.horizontal)
-        .padding(.top, 4)
+        .foregroundStyle(.white)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        .onTapGesture(perform: install)
+        .background {
+            // Fill up under the status bar so the bar reads as part of the screen edge.
+            Rectangle()
+                .fill(Color.accentColor.gradient)
+                .ignoresSafeArea(edges: .top)
+                .shadow(color: .black.opacity(0.15), radius: 6, y: 2)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
