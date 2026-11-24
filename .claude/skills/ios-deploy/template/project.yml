@@ -1,0 +1,43 @@
+# XcodeGen spec. Edit this, never the generated .xcodeproj (it's gitignored);
+# deploy.sh runs `xcodegen generate` before every build.
+name: __APP__
+options:
+  bundleIdPrefix: __PREFIX__
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+packages:
+  HomeUpdater:
+    path: ../packages/HomeUpdater
+settings:
+  base:
+    MARKETING_VERSION: "1.0"
+    CURRENT_PROJECT_VERSION: "1"   # deploy.sh sets a YYYYMMDDHHMM timestamp
+    SWIFT_VERSION: "6.0"
+    CODE_SIGN_STYLE: Automatic
+    APP_DIST_HOST: ""              # deploy.sh passes the NAS's ts.net name
+targets:
+  __APP__:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    dependencies:
+      - package: HomeUpdater
+    info:
+      path: Sources/Info.plist
+      properties:
+        CFBundleDisplayName: __DISPLAY__
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        HomeUpdaterHost: $(APP_DIST_HOST)
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: __BUNDLE_ID__
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon

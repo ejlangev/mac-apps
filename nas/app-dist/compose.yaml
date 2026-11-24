@@ -1,0 +1,32 @@
+# TrueNAS custom app "app-dist": serves the iOS app builds in tank/app-dist over
+# HTTPS on the tailnet only (tailscale serve, ts.net certificate, no Funnel).
+# Box paths: config and Tailscale state live on the apps pool under /mnt/apps/app-dist
+# (has a .nobackup marker: it holds Tailscale node keys); builds live on tank.
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    hostname: app-dist
+    environment:
+      TS_HOSTNAME: app-dist
+      TS_AUTHKEY: file:/secrets/ts-authkey   # one-time tagged key; state persists after login
+      TS_EXTRA_ARGS: --advertise-tags=tag:app-dist
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - /mnt/apps/app-dist/tailscale:/var/lib/tailscale
+      - /mnt/apps/app-dist/secrets:/secrets:ro
+      - /mnt/apps/app-dist/config/serve.json:/config/serve.json:ro
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:latest
+    network_mode: service:tailscale     # only reachable through tailscale serve
+    depends_on:
+      - tailscale
+    entrypoint: ["/bin/sh", "/config/caddy-start.sh"]
+    volumes:
+      - /mnt/apps/app-dist/config:/config:ro
+      - /mnt/tank/app-dist/pub/www:/srv:ro
+      - /mnt/tank/app-dist/pub/acl:/acl:ro
+    restart: unless-stopped

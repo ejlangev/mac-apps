@@ -1,0 +1,27 @@
+{
+	admin localhost:2019
+	auto_https off
+	persist_config off
+}
+
+# Plain HTTP on loopback; tailscale serve terminates TLS with the ts.net certificate
+# and adds Tailscale-User-Login, which the generated access rules check per app.
+http://:8080 {
+	bind 127.0.0.1
+
+	# Written by caddy-start.sh from /acl/acl.txt: each app answers 404 to
+	# Tailscale users who aren't on its device list.
+	import /tmp/acl/acl.caddy
+
+	root * /srv
+
+	# OTA installs fail without an error when these are wrong.
+	@ipa path *.ipa
+	header @ipa Content-Type application/octet-stream
+	@plist path *.plist
+	header @plist Content-Type application/xml
+	@fresh path / *.html *.json *.plist *.txt
+	header @fresh Cache-Control no-store
+
+	file_server
+}
