@@ -9,3 +9,5 @@ signing on the devices listed in `deploy.json`, never through the App Store.
 - Keep `.homeUpdater()` on the root view: it is how the installed app learns a new build exists.
 - `devices` in `deploy.json` are names from the private `~/.config/ios-deploy/config.json`.
   Never put UDIDs, emails, team IDs or hostnames in this folder: the repo is public.
+- Design for the iPhone Duo first (the main phone). Optimize layouts and features for its
+  screen and form factor, but keep the app working on other iPhones.
